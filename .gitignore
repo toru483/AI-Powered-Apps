@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environment
+venv/
+
+# Ollama models
+.ollama/
+
+# Docker
+*.log
+
+# OS files
+.DS_Store
