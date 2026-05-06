@@ -4,9 +4,17 @@ import subprocess
 import tempfile
 import os
 
-st.title("AI-Powered Coding System (Web UI)")
+# タイトル（日本語）
+st.title("コード生成アシスタント")
 
-# 入力欄
+# 言語選択プルダウン
+language = st.selectbox(
+    "出力するプログラミング言語を選択してください",
+    ["Python", "C++", "Rust", "JavaScript", "Go", "Java"],
+    index=0
+)
+
+# 問題文入力欄
 problem_text = st.text_area("問題文を入力してください", height=200)
 
 if st.button("コード生成 & 実行"):
@@ -15,10 +23,10 @@ if st.button("コード生成 & 実行"):
     else:
         st.write("### 🔧 コード生成中…")
 
-        # LLM にコード生成を依頼
+        # LLM に渡すプロンプト
         prompt = f"""
 あなたは競技プログラミングのプロです。
-次の問題を解く Python コードを生成してください。
+次の問題を解く {language} のコードを生成してください。
 
 問題:
 {problem_text}
@@ -33,16 +41,20 @@ if st.button("コード生成 & 実行"):
 
         code = response["message"]["content"]
 
-        st.code(code, language="python")
+        st.code(code, language=language.lower())
 
-        # 一時ファイルに保存
+        # Python 以外はまだ実行できないので注意
+        if language != "Python":
+            st.warning(f"{language} の実行環境はまだ未対応です。コード生成のみ行いました。")
+            st.stop()
+
+        # Python のみ Docker 実行
         with tempfile.NamedTemporaryFile(delete=False, suffix=".py") as tmp:
             tmp.write(code.encode("utf-8"))
             tmp_path = tmp.name
 
         st.write("### 🐳 Docker で実行中…")
 
-        # Docker 実行
         try:
             result = subprocess.run(
                 ["docker", "run", "--rm", "-i",
