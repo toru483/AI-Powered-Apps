@@ -4,7 +4,12 @@ import subprocess
 import tempfile
 import os
 
-# コードクリーンアップ関数を追加
+# テンプレート管理
+from templates import TEMPLATES
+from problem_classifier import classify_problem
+
+
+# コードクリーンアップ関数
 def clean_code(raw: str) -> str:
     text = raw.replace("```python", "").replace("```", "")
     text = text.replace("[/CODE]", "").replace("[/EXPLANATION]", "")
@@ -16,27 +21,24 @@ def split_response(raw: str):
     code = ""
     explanation = ""
 
-    # タグが両方ある場合のみ処理
     if "[CODE]" in raw and "[EXPLANATION]" in raw:
-        # [CODE] と [EXPLANATION] の間をコードとして抽出
         code = raw.split("[CODE]")[1].split("[EXPLANATION]")[0].strip()
-        # [EXPLANATION] 以降を説明文として抽出
         explanation = raw.split("[EXPLANATION]")[1].strip()
 
     return code, explanation
 
 
-# タイトル（日本語）
+# タイトル
 st.title("コード生成アシスタント")
 
-# 言語選択プルダウン
+# 言語選択
 language = st.selectbox(
     "出力するプログラミング言語を選択してください",
     ["Python", "C++", "Rust", "JavaScript", "Go", "Java"],
     index=0
 )
 
-# 問題文入力欄
+# 問題文入力
 problem_text = st.text_area("問題文を入力してください", height=200)
 
 if st.button("コード生成 & 実行"):
@@ -45,62 +47,43 @@ if st.button("コード生成 & 実行"):
     else:
         st.write("### 🔧 コード生成中…")
 
-        # LLM に渡すプロンプト
-        prompt = f"""
-あなたは競技プログラミングのプロです。
-次の問題を解く {language} のコードを生成してください。
+        # ① 問題タイプを分類
+        problem_type = classify_problem(problem_text)
+        st.write(f"推定された問題タイプ: **{problem_type}**")
 
-【厳守する出力形式】
-以下のテンプレートを **そのまま** 使用して出力してください。
-タグ名は絶対に変更しないでください。
+        # ② テンプレートを取得
+        template = TEMPLATES.get(problem_type, TEMPLATES["累積和"])  # fallback は後で一般テンプレに変更
 
-[CODE]
-<ここにコードのみを書く。コードブロック（```）は禁止>
+        # ③ テンプレートに問題文を埋め込む
+        prompt = template.format(language=language, problem_text=problem_text)
 
-[EXPLANATION]
-<ここに説明文を書く。最後に必ず計算量（Big-O）を書く>
-
-【禁止事項】
-- [CODE] の前に説明文を書かない
-- [EXPLANATION] の前にコードを書かない
-- タグ名（[CODE], [EXPLANATION]）を変更しない
-- **閉じタグ（[/CODE], [/EXPLANATION]）を絶対に出力しない**
-- コードブロック（```）を絶対に使わない
-
-問題:
-{problem_text}
-
-"""
-
+        # ④ LLM に渡す
         response = ollama.chat(
             model="llama3.1",
             messages=[{"role": "user", "content": prompt}]
         )
 
-        code_raw = response["message"]["content"]
         response_text = response["message"]["content"]
 
-        # ① コードと説明文を分離
+        # ⑤ コードと説明文を分離
         code_raw, explanation = split_response(response_text)
 
-        # ② コード部分だけクリーンアップ
+        # ⑥ コードをクリーンアップ
         code = clean_code(code_raw)
 
-        # ③ UI に表示
+        # ⑦ UI に表示
         st.subheader("🧩 生成されたコード")
         st.code(code, language=language.lower())
 
         st.subheader("📘 説明（計算量つき）")
         st.write(explanation)
 
-
-
-        # Python 以外はまだ実行できないので注意
+        # ⑧ Python 以外は実行不可
         if language != "Python":
             st.warning(f"{language} の実行環境はまだ未対応です。コード生成のみ行いました。")
             st.stop()
 
-        # Python のみ Docker 実行
+        # ⑨ Docker 実行
         with tempfile.NamedTemporaryFile(delete=False, suffix=".py") as tmp:
             tmp.write(code.encode("utf-8"))
             tmp_path = tmp.name
