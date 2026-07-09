@@ -137,7 +137,6 @@ MIT License
 自由に利用・改変・商用利用できます。
 
 👤 Author
-<<<<<<< HEAD
 トオル|FPxコーダー
 Ubuntu / Docker / AI 自動化開発
 競技プログラミング向け AI システム構築中
